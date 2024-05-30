@@ -9,6 +9,7 @@ enum GameMode {
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
 const FRAME_DURATION: f32 = 50.0;
+const POSITION_OFFSET: i32 = 5;
 
 
 struct Player {
@@ -16,7 +17,7 @@ struct Player {
     y: i32,
     velocity: f32,
     time: f32,
-    // flap_start_time: Option<f32>,
+    flap_start_time: Option<f32>,
 }
 
 impl Player {
@@ -26,12 +27,12 @@ impl Player {
             y,
             velocity: 0.0,
             time: 0.0,
-            // flap_start_time: None,
+            flap_start_time: None,
         }
     }
 
     fn render(&mut self, ctx: &mut BTerm) {
-        ctx.set(5, self.y, YELLOW, BLACK, to_cp437('@'))
+        ctx.set(POSITION_OFFSET, self.y, YELLOW, BLACK, to_cp437('@'))
     }
 
     fn gravity_and_move(&mut self) {
@@ -64,7 +65,7 @@ struct State {
 impl State {
     fn new() -> Self {
         State {
-            player: Player::new(5, 25),
+            player: Player::new(POSITION_OFFSET, 25),
             frame_time: 0.0,
             mode: GameMode::Menu,
             obstacle: Obstacle::new(SCREEN_WIDTH, 0),
@@ -91,7 +92,7 @@ impl State {
         self.player.render(ctx);
         self.obstacle.render(ctx, self.player.x);
 
-        if self.player.x > self.obstacle.x + 5 {
+        if self.player.x > self.obstacle.x + POSITION_OFFSET {
             self.score += 1;
             self.obstacle = Obstacle::new(self.player.x + SCREEN_WIDTH, self.score)
         }
@@ -106,7 +107,7 @@ impl State {
     }
 
     fn restart(&mut self) {
-        self.player = Player::new(0, 25);
+        self.player = Player::new(POSITION_OFFSET, 25);
         self.frame_time = 0.0;
         self.mode = GameMode::Playing;
         self.obstacle = Obstacle::new(SCREEN_WIDTH, 0);
@@ -172,7 +173,7 @@ impl Obstacle {
     }
 
     fn render(&mut self, ctx: &mut BTerm, player_x: i32) {
-        let screen_x = self.x - player_x + 5;
+        let screen_x = self.x - player_x + POSITION_OFFSET;
         let half_size = self.size / 2;
 
         for y in 0..self.gap_y - half_size {
