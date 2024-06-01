@@ -1,4 +1,12 @@
 use bracket_lib::prelude::*;
+use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::path::Path;
+use serde::{Serialize, Deserialize};
+use chrono::{Utc, DateTime};
+
+const SCORE_FILE_PATH: &str = "high_score.json";
 
 enum GameMode {
     Menu,
@@ -10,6 +18,7 @@ const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
 const FRAME_DURATION: f32 = 50.0;
 const POSITION_OFFSET: i32 = 5;
+const OBSTACLE_GAP: i32 = 5;
 
 
 struct Player {
@@ -17,7 +26,6 @@ struct Player {
     y: i32,
     velocity: f32,
     time: f32,
-    flap_start_time: Option<f32>,
 }
 
 impl Player {
@@ -27,7 +35,6 @@ impl Player {
             y,
             velocity: 0.0,
             time: 0.0,
-            flap_start_time: None,
         }
     }
 
@@ -58,18 +65,24 @@ struct State {
     player: Player,
     frame_time: f32,
     mode: GameMode,
-    obstacle: Obstacle,
+    obstacles: VecDeque<Obstacle>,
     score: i32,
+    history_score: Option<io::Result<Score>>,
 }
 
 impl State {
     fn new() -> Self {
+        // println!("{}", SCREEN_WIDTH / OBSTACLE_GAP + 1);
+        // let obstacles: VecDeque<Obstacle> = (0..=SCREEN_WIDTH / OBSTACLE_GAP)
+        //     .map(|i| Obstacle::new(SCREEN_WIDTH + (i * OBSTACLE_GAP), 0))
+        //     .collect();
         State {
             player: Player::new(POSITION_OFFSET, 25),
             frame_time: 0.0,
             mode: GameMode::Menu,
-            obstacle: Obstacle::new(SCREEN_WIDTH, 0),
+            obstacles: VecDeque::new(),
             score: 0,
+            history_score: None,
         }
     }
 
@@ -90,36 +103,63 @@ impl State {
         }
 
         self.player.render(ctx);
-        self.obstacle.render(ctx, self.player.x);
 
-        if self.player.x > self.obstacle.x + POSITION_OFFSET {
+
+        let pass_obstacle = self.player.x > self.obstacles.front().unwrap().x + POSITION_OFFSET;
+        // 判断
+        if pass_obstacle {
             self.score += 1;
-            self.obstacle = Obstacle::new(self.player.x + SCREEN_WIDTH, self.score)
+            self.obstacles.pop_front();
+        }
+        if pass_obstacle {
+            if let Some(last) = self.obstacles.back() {
+                self.obstacles.push_back(Obstacle::new(last.x + OBSTACLE_GAP, self.score));
+            }
         }
 
-        if self.player.y > SCREEN_HEIGHT || self.obstacle.hit_obstacle(&self.player) {
-            self.mode = GameMode::End;
+        // 渲染 & 判断
+        for obstacle in &self.obstacles {
+            obstacle.render(ctx, self.player.x);
+
+            if self.player.y > SCREEN_HEIGHT || obstacle.hit_obstacle(&self.player) {
+                let highscore_manager = HighScoreManager::new(SCORE_FILE_PATH);
+                self.history_score = Some(highscore_manager.update_highscore(self.score));
+                self.mode = GameMode::End;
+            }
         }
 
         ctx.print(0, 0, "Press Space to Flap");
         ctx.print(0, 1, &format!("Score: {}", self.score));
-        ctx.print(0, 2, &format!("{} {}", self.player.x, self.obstacle.x));
+        ctx.print(0, 2, &format!("{} {}", self.player.x, self.obstacles.back().unwrap().x));
     }
 
     fn restart(&mut self) {
         self.player = Player::new(POSITION_OFFSET, 25);
         self.frame_time = 0.0;
         self.mode = GameMode::Playing;
-        self.obstacle = Obstacle::new(SCREEN_WIDTH, 0);
+        self.obstacles = (0..=SCREEN_WIDTH / OBSTACLE_GAP)
+            .map(|i| Obstacle::new(SCREEN_WIDTH + (i * OBSTACLE_GAP), 0))
+            .collect();
         self.score = 0;
     }
 
     fn dead(&mut self, ctx: &mut BTerm) {
+        let history_score = match &self.history_score {
+            Some(Ok(score)) => {
+                match score {
+                    Score::NewRecord => "You set a new record!".to_string(),
+                    Score::HistoryRecord(n) => format!("The highest score ever was {}", n)
+                }
+            }
+            Some(Err(_)) => "(Unable to read the highest score in history)".to_string(),
+            _ => { String::new() }
+        };
         ctx.cls();
         ctx.print_centered(5, "You are dead!");
         ctx.print_centered(6, &format!("You earned {} points", self.score));
-        ctx.print_centered(8, "(P) Play Again");
-        ctx.print_centered(9, "(Q) Quit Game");
+        ctx.print_centered(7, history_score);
+        ctx.print_centered(9, "(P) Play Again");
+        ctx.print_centered(10, "(Q) Quit Game");
 
         if let Some(key) = ctx.key {
             match key {
@@ -172,7 +212,7 @@ impl Obstacle {
         }
     }
 
-    fn render(&mut self, ctx: &mut BTerm, player_x: i32) {
+    fn render(&self, ctx: &mut BTerm, player_x: i32) {
         let screen_x = self.x - player_x + POSITION_OFFSET;
         let half_size = self.size / 2;
 
@@ -201,4 +241,68 @@ fn main() -> BError {
         .build()?;
 
     main_loop(context, State::new())
+}
+
+enum Score {
+    NewRecord,
+    HistoryRecord(i32),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct HighScore {
+    score: i32,
+    timestamp: DateTime<Utc>,
+}
+
+struct HighScoreManager {
+    file_path: String,
+}
+
+impl HighScoreManager {
+    fn new(file_path: &str) -> Self {
+        Self {
+            file_path: file_path.to_string(),
+        }
+    }
+
+    fn read_highscore(&self) -> io::Result<HighScore> {
+        if !Path::new(&self.file_path).exists() {
+            return Ok(HighScore {
+                score: 0,
+                timestamp: Utc::now(),
+            });
+        }
+
+        let mut file = File::open(&self.file_path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let highscore: HighScore = serde_json::from_str(&contents)
+            .unwrap_or(HighScore {
+                score: 0,
+                timestamp: Utc::now(),
+            });
+
+        Ok(highscore)
+    }
+
+    fn write_highscore(&self, highscore: &HighScore) -> io::Result<()> {
+        let serialized = serde_json::to_string(highscore)?;
+        let mut file = File::create(&self.file_path)?;
+        file.write_all(serialized.as_bytes())
+    }
+
+    fn update_highscore(&self, new_score: i32) -> io::Result<Score> {
+        let current_highscore = self.read_highscore()?;
+        if new_score > current_highscore.score {
+            let new_highscore = HighScore {
+                score: new_score,
+                timestamp: Utc::now(),
+            };
+            self.write_highscore(&new_highscore)?;
+            Ok(Score::NewRecord)
+        } else {
+            Ok(Score::HistoryRecord(current_highscore.score))
+        }
+    }
 }
