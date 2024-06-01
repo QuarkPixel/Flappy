@@ -18,7 +18,7 @@ const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
 const FRAME_DURATION: f32 = 50.0;
 const POSITION_OFFSET: i32 = 5;
-const OBSTACLE_GAP: i32 = 5;
+const OBSTACLE_GAP: i32 = 30;
 
 
 struct Player {
