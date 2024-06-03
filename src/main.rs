@@ -3,6 +3,7 @@ mod plr;
 mod obs;
 mod ste;
 mod palette;
+mod libs;
 
 use bracket_lib::prelude::*;
 
