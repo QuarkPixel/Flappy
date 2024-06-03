@@ -1,4 +1,4 @@
-use bracket_lib::prelude::{BTerm, to_cp437};
+use bracket_lib::prelude::{BTerm};
 use crate::{POSITION_OFFSET, HIGHLIGHT_DURATION};
 use crate::libs::blend_colors;
 use crate::palette;
