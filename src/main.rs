@@ -20,7 +20,7 @@ const HIGHLIGHT_DURATION: f32 = 500.0;
 fn main() -> BError {
     let context = BTermBuilder::simple(SCREEN_WIDTH, SCREEN_HEIGHT)
         .unwrap()
-        .with_title("Flappy Dragon")
+        .with_title("Flappy Pixel")
         .build()?;
 
     main_loop(context, ste::State::new())

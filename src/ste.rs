@@ -66,7 +66,7 @@ impl State {
         if let Some(key) = ctx.key {
             match key {
                 VirtualKeyCode::Space => self.player.flap(),
-                VirtualKeyCode::Q => self.mode = GameMode::End,
+                VirtualKeyCode::Q => self.dying(),
                 _ => {}
             }
         }
@@ -97,9 +97,7 @@ impl State {
 
         // 判断
         if self.player.y > SCREEN_HEIGHT || self.obstacles.front().unwrap().hit_obstacle(&self.player) {
-            let highscore_manager = sc::HighScoreManager::new(SCORE_FILE_PATH);
-            self.history_score = Some(highscore_manager.update_highscore(self.score));
-            self.mode = GameMode::End;
+            self.dying();
         }
 
         ctx.print_color(0, 0, palette::TEXT, background_color, "Press Space to Flap");
@@ -115,6 +113,12 @@ impl State {
             .collect();
         self.score = 0;
         self.highlight_countdown = HIGHLIGHT_DURATION;
+    }
+
+    fn dying(&mut self) {
+        let highscore_manager = sc::HighScoreManager::new(SCORE_FILE_PATH);
+        self.history_score = Some(highscore_manager.update_highscore(self.score));
+        self.mode = GameMode::End;
     }
 
     fn dead(&mut self, ctx: &mut BTerm) {
@@ -146,7 +150,7 @@ impl State {
 
     fn main_menu(&mut self, ctx: &mut BTerm) {
         ctx.cls_bg(palette::BACKGROUND);
-        print_c(ctx, 5, "Welcome to Flappy Dragon");
+        print_c(ctx, 5, "Welcome to Flappy Pixel");
         print_c(ctx, 8, "(P) Play Game");
         print_c(ctx, 9, "(Q) Quit Game");
 
