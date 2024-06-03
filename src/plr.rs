@@ -31,7 +31,7 @@ impl Player {
                 self.highlight_countdown / HIGHLIGHT_DURATION,
             )
         } else { palette::BIRD };
-        ctx.set(POSITION_OFFSET, self.y, color, color, to_cp437('♂'))
+        ctx.set_bg(POSITION_OFFSET, self.y, color);
     }
 
     pub(crate) fn gravity_and_move(&mut self) {

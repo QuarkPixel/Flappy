@@ -1,4 +1,4 @@
-use bracket_lib::prelude::{BTerm, RandomNumberGenerator, to_cp437};
+use bracket_lib::prelude::{BTerm, RandomNumberGenerator};
 use crate::{plr, POSITION_OFFSET, SCREEN_HEIGHT};
 use crate::palette;
 
@@ -25,11 +25,11 @@ impl Obstacle {
         let half_size = self.size / 2;
 
         for y in 0..self.gap_y - half_size {
-            ctx.set(screen_x, y, palette::OBSTACLE, palette::OBSTACLE_BG, to_cp437('P'));
+            ctx.set_bg(screen_x, y, palette::OBSTACLE);
         }
 
         for y in self.gap_y + half_size..SCREEN_HEIGHT {
-            ctx.set(screen_x, y, palette::OBSTACLE, palette::OBSTACLE_BG, to_cp437('P'));
+            ctx.set_bg(screen_x, y, palette::OBSTACLE);
         }
     }
 
